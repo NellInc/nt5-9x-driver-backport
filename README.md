@@ -1,16 +1,16 @@
 # NT Miniport Backport for Windows 9x
 
-Run unmodified NT4 SCSI miniport drivers inside Windows 98.
+Run unmodified Windows NT/2000/XP SCSI miniport drivers inside Windows 98.
 
-NTMINI.VXD loads NT4's `atapi.sys` at ring 0, provides the ScsiPort API it expects, and bridges the result into Win98's IFSMgr file system layer. The same 27,600-byte binary that ships with NT4 SP6a, running inside Win98's kernel, providing CD-ROM file access where the native driver stack fails.
+NTMINI.VXD loads `atapi.sys` at ring 0, provides the ScsiPort API it expects, and bridges the result into Win98's IFSMgr file system layer. An unmodified NT miniport binary, running inside Win98's kernel, providing CD-ROM file access where the native driver stack fails.
 
 ## Why
 
-Windows NT from version 4 onward has a clean, well-documented miniport driver architecture. Storage drivers are small, hardware-specific modules that talk through a standard ScsiPort interface.
+Windows NT/2000/XP has a clean, well-documented miniport driver architecture. Storage drivers are small, hardware-specific modules that talk through a standard ScsiPort interface. The `atapi.sys` miniport handles basically every IDE/ATAPI controller.
 
 Windows 9x has none of this. Its storage stack depends on vendor-specific VxDs and port drivers (.PDR files) that have been abandonware for two decades. If the built-in `ESDI_506.PDR` doesn't support your controller, or your optical drive isn't detected, your options are limited.
 
-Rather than writing yet another Win9x driver from scratch, this project loads the unmodified NT4 miniport binary and provides the runtime environment it expects. In principle, this approach could work with any NT4 SCSI miniport: `atapi.sys`, `sym_hi.sys` for Symbios/LSI SCSI, `aic78xx.sys` for Adaptec. The current implementation uses `atapi.sys` because IDE controllers are everywhere and easy to test.
+Rather than writing yet another Win9x driver from scratch, this project loads an unmodified NT miniport binary and provides the runtime environment it expects. In principle, this approach could work with any NT SCSI miniport: `atapi.sys`, `sym_hi.sys` for Symbios/LSI SCSI, `aic78xx.sys` for Adaptec. The current implementation uses `atapi.sys` because IDE controllers are everywhere and easy to test.
 
 ## Current Status
 
@@ -94,7 +94,7 @@ cp builds/V5SMALL.VXD deploy-package/NTMINI.VXD
 ## Architecture
 
 ```
-NT4 atapi.sys (unmodified PE binary, 27,600 bytes)
+atapi.sys (unmodified NT miniport PE binary, 27,600 bytes)
     |
     v
 NTMINI.VXD (Win98 LE VxD)
@@ -139,7 +139,7 @@ NTMINI.VXD (Win98 LE VxD)
 | `NTMINI_V5.C` | ScsiPort shim (29 functions), IOS bridge, IFSMgr FSD, IFS hook, ISO 9660 parser, ATAPI I/O |
 | `VXDWRAP_V4.ASM` | VxD DDB, control procedure, VMM/VPICD trampolines, ScsiPort struct-return stubs, IFSMgr/IOS service wrappers, Ring0_FileIO wrappers |
 | `PELOAD.C` | Ring 0 PE image loader with section mapping, base relocations, and import resolution |
-| `ATAPI_EMBEDDED.H` | NT4 `atapi.sys` as a 27,600-byte C array |
+| `ATAPI_EMBEDDED.H` | `atapi.sys` miniport as a 27,600-byte C array |
 | `build_sysini_fixed.py` | Post-linker: fixes LE headers for Win98 VMM compatibility |
 | `deploy_sysini.py` | Deploys VXD to a FAT32 disk image for VM testing |
 | `test_ios_chain.py` | Automated VM boot, deployment, and log analysis |
@@ -154,7 +154,7 @@ NTMINI.VXD (Win98 LE VxD)
 
 ### 1. MSVC vs Watcom ABI: The 8-Byte Struct Return Problem
 
-NT4's `atapi.sys` is compiled with MSVC. Our VxD uses Open Watcom. These compilers disagree on how to return small structs.
+The NT `atapi.sys` is compiled with MSVC. Our VxD uses Open Watcom. These compilers disagree on how to return small structs.
 
 `ScsiPortConvertUlongToPhysicalAddress` returns an 8-byte `SCSI_PHYSICAL_ADDRESS`. MSVC returns this in EDX:EAX. Watcom would use a hidden pointer parameter. If you implement this in C with Watcom, the calling convention mismatch corrupts the stack.
 
@@ -186,7 +186,7 @@ Fix: present primary IDE addresses (0x1F0, 0x3F6) in the access ranges, then rem
 
 ### 4. HwFindAdapter Multi-Pass Detection
 
-NT4's `atapi.sys` HwFindAdapter has an internal state machine that iterates across four IDE channels over multiple calls. ScsiPortInitialize calls HwFindAdapter in a loop while the miniport sets `*again = TRUE`. You must zero the access ranges between calls so the miniport advances its channel index.
+The `atapi.sys` HwFindAdapter has an internal state machine that iterates across four IDE channels over multiple calls. ScsiPortInitialize calls HwFindAdapter in a loop while the miniport sets `*again = TRUE`. You must zero the access ranges between calls so the miniport advances its channel index.
 
 ### 5. IOS Registration: DRP Struct Packing
 
@@ -278,7 +278,7 @@ For file read operations through the IFS hook, the byte count is at ioreq+0x00 a
 │   ├── NTMINI_V5.C          # Main driver source (~4,700 lines)
 │   ├── VXDWRAP_V4.ASM       # Assembly wrapper
 │   ├── PELOAD.C              # PE image loader
-│   ├── ATAPI_EMBEDDED.H      # NT4 atapi.sys binary
+│   ├── ATAPI_EMBEDDED.H      # atapi.sys miniport binary
 │   └── Dockerfile            # Build environment
 ├── builds/
 │   └── link_v5full.lnk       # Linker script
