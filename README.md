@@ -1,8 +1,8 @@
 # NT Miniport Backport for Windows 9x
 
-Run unmodified Windows NT/2000/XP SCSI miniport drivers inside Windows 98.
+Run unmodified Windows NT/2000/XP storage miniport drivers inside Windows 98. Supports IDE/ATAPI and SCSI controllers through the standard ScsiPort API.
 
-NTMINI.VXD loads `atapi.sys` at ring 0, provides the ScsiPort API it expects, and bridges the result into Win98's IFSMgr file system layer. An unmodified NT miniport binary, running inside Win98's kernel, providing CD-ROM file access where the native driver stack fails.
+NTMINI.VXD loads `atapi.sys` at ring 0, provides the ScsiPort API it expects, and bridges the result into Win98's IFSMgr file system layer. An unmodified NT miniport binary, running inside Win98's kernel, providing CD-ROM file access where the native driver stack fails. The same approach works for any NT storage miniport: IDE/ATAPI (`atapi.sys`), Symbios/LSI SCSI (`sym_hi.sys`), Adaptec SCSI (`aic78xx.sys`), and others.
 
 ## Why
 
@@ -10,7 +10,7 @@ Windows NT/2000/XP has a clean, well-documented miniport driver architecture. St
 
 Windows 9x has none of this. Its storage stack depends on vendor-specific VxDs and port drivers (.PDR files) that have been abandonware for two decades. If the built-in `ESDI_506.PDR` doesn't support your controller, or your optical drive isn't detected, your options are limited.
 
-Rather than writing yet another Win9x driver from scratch, this project loads an unmodified NT miniport binary and provides the runtime environment it expects. In principle, this approach could work with any NT SCSI miniport: `atapi.sys`, `sym_hi.sys` for Symbios/LSI SCSI, `aic78xx.sys` for Adaptec. The current implementation uses `atapi.sys` because IDE controllers are everywhere and easy to test.
+Rather than writing yet another Win9x driver from scratch, this project loads an unmodified NT miniport binary and provides the runtime environment it expects. The ScsiPort API is common to all NT storage miniports, so any driver built against it can run in this shim: IDE/ATAPI controllers (`atapi.sys`), Symbios/LSI SCSI (`sym_hi.sys`), Adaptec SCSI (`aic78xx.sys`), and others. The current implementation uses `atapi.sys` because IDE controllers are everywhere and easy to test.
 
 ## Current Status
 
@@ -266,7 +266,7 @@ For file read operations through the IFS hook, the byte count is at ioreq+0x00 a
 
 ## What Would Help
 
-**Real hardware testing.** If you have Pentium-class hardware with an IDE CD-ROM drive and would be willing to try this, that would be extremely valuable. Reports of what works (or doesn't) on real controllers would help identify where the QEMU-specific workarounds end and where genuine hardware edge cases begin.
+**Real hardware testing.** If you have Pentium-class hardware with an IDE/ATAPI or SCSI CD-ROM drive and would be willing to try this, that would be extremely valuable. Reports of what works (or doesn't) on real controllers would help identify where the QEMU-specific workarounds end and where genuine hardware edge cases begin.
 
 **Win32 application testing.** The file access pipeline works from ring 0, but hasn't been tested with user-mode programs doing `CreateFile`/`ReadFile` on D:, or with Explorer browsing D:. The IFSMgr handles should be valid for Win32 access, but it hasn't been verified.
 
